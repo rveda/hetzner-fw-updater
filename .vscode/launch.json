@@ -1,0 +1,61 @@
+{
+    // Requires the CodeLLDB extension (vadimcn.vscode-lldb).
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "update",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": ["build", "--bin=hetzner-fw-updater", "--package=hetzner-fw-updater"],
+                "filter": { "name": "hetzner-fw-updater", "kind": "bin" }
+            },
+            "args": ["update", "${input:configFile}"],
+            "env": { "API_TOKEN": "${input:apiToken}" },
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "download",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": ["build", "--bin=hetzner-fw-updater", "--package=hetzner-fw-updater"],
+                "filter": { "name": "hetzner-fw-updater", "kind": "bin" }
+            },
+            "args": ["download", "${input:configFile}", "${input:firewallName}"],
+            "env": { "API_TOKEN": "${input:apiToken}" },
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "check",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": ["build", "--bin=hetzner-fw-updater", "--package=hetzner-fw-updater"],
+                "filter": { "name": "hetzner-fw-updater", "kind": "bin" }
+            },
+            "args": ["check", "${input:configFile}"],
+            "env": { "API_TOKEN": "${input:apiToken}" },
+            "cwd": "${workspaceFolder}"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "configFile",
+            "type": "promptString",
+            "description": "Path to config file",
+            "default": "config.json"
+        },
+        {
+            "id": "firewallName",
+            "type": "promptString",
+            "description": "Firewall name"
+        },
+        {
+            "id": "apiToken",
+            "type": "promptString",
+            "description": "Hetzner Cloud API token",
+            "password": true
+        }
+    ]
+}

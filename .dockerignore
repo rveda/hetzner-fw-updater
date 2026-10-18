@@ -1,0 +1,7 @@
+/target
+/.git
+/.vscode
+.env
+.env.*
+*.json
+*.json.*.tmp

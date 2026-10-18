@@ -1,0 +1,18 @@
+# Build output
+/target
+
+# Temporary file written while the config file is saved
+*.json.*.tmp
+
+# Environment files that may hold the API token
+.env
+.env.*
+
+# Editor and OS files
+.vscode/*
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*~
+.DS_Store
