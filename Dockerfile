@@ -21,10 +21,14 @@ RUN touch src/main.rs && cargo build --release --locked
 FROM alpine:3.22
 
 COPY --from=build /src/target/release/hetzner-fw-updater /usr/local/bin/hetzner-fw-updater
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Mount the directory holding the config file here. Mount the directory, not
 # the file: download saves through a temporary file that it renames.
 WORKDIR /config
 USER nobody
 
-ENTRYPOINT ["hetzner-fw-updater"]
+# With arguments, runs the tool with them; without, runs check every
+# CHECK_INTERVAL seconds.
+ENV CHECK_INTERVAL=900
+ENTRYPOINT ["docker-entrypoint.sh"]

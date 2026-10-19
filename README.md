@@ -278,10 +278,8 @@ Notes:
   runs never overlap.
 - `check` only reads the config file, which is why the service can use a
   read-only file system. Run `download` by hand, not from this service.
-- To run the Docker image instead, replace `ExecStart` with the `docker run`
-  command from [Docker](#docker), using `--env-file /etc/hetzner-fw/token.env`
-  instead of `-e API_TOKEN`, and remove `DynamicUser=yes` and the `Protect…`
-  lines, since the service user must be able to use Docker.
+- To use Docker instead, you need no timer: the image can run `check` on a
+  schedule itself, see [Running check regularly in Docker](#running-check-regularly-in-docker).
 
 ### cron
 
@@ -311,9 +309,10 @@ the binary into a small Alpine runtime image (about 6 MB).
 docker build -t hetzner-fw-updater .
 ```
 
-The container runs the tool directly, so pass the command and its arguments to
-`docker run`. Mount the directory that holds the config file at `/config`, the
-container's working directory, and pass the token from your environment:
+Pass the command and its arguments to `docker run` to run the tool once;
+without a command, the container runs `check` every 15 minutes (see below).
+Mount the directory that holds the config file at `/config`, the container's
+working directory, and pass the token from your environment:
 
 ```sh
 docker run --rm -e API_TOKEN -v "$PWD:/config" hetzner-fw-updater check config.json
@@ -339,14 +338,25 @@ Things to know:
   IPv4 address is put in the rules; `check` also probes over IPv4 only. On
   Linux, add `--network host` to use the host's addresses, IPv6 included.
 
-To run `check` regularly, for example every 10 minutes from cron, keep the
-token in a file that only you can read and point Docker at it:
+### Running check regularly in Docker
+
+Started without a command, the container runs `check` on
+`/config/config.json` every 15 minutes until it is stopped. Keep the token in
+a file that only you can read and point Docker at it:
 
 ```sh
-*/10 * * * * docker run --rm --network host --env-file /home/me/.hetzner-fw.env -v /home/me/hetzner-fw:/config hetzner-fw-updater check config.json
+docker run -d --name hetzner-fw-check --restart unless-stopped --network host \
+    --env-file /home/me/.hetzner-fw.env -v /home/me/hetzner-fw:/config \
+    hetzner-fw-updater
 ```
 
 where `/home/me/.hetzner-fw.env` contains `API_TOKEN=your-token-here`.
+
+- The first check runs at startup, and each later one 15 minutes after the
+  previous one finished. Set `CHECK_INTERVAL` to another number of seconds to
+  change this, e.g. `-e CHECK_INTERVAL=300`.
+- A failed check is logged and the next one still runs, so the container keeps
+  running. See the output with `docker logs -t hetzner-fw-check`.
 
 ## Development
 
