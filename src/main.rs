@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::Write;
 use std::net::IpAddr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -18,6 +18,8 @@ use ureq::Agent;
 
 const API_BASE: &str = "https://api.hetzner.cloud/v1";
 const IP_LOOKUP: &str = "https://ip.hetzner.com";
+/// Config file used when the command line does not name one.
+const DEFAULT_CONFIG: &str = "/etc/hetzner-fw/config.json";
 /// Placeholder in `source_ips` / `destination_ips` that update replaces
 /// with the caller's public IP addresses.
 const MY_PUBLIC_IP: &str = "{{my-public-ip}}";
@@ -37,9 +39,9 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 fn usage(prog: &str) -> ExitCode {
     eprintln!(
         "Usage:
-  {prog} download <config file> <firewall name>
-  {prog} update <config file>
-  {prog} check <config file>
+  {prog} download [<config file>] <firewall name>
+  {prog} update [<config file>]
+  {prog} check [<config file>]
 
 Commands:
   download        Download a firewall's rules into the config file, adding the
@@ -50,6 +52,8 @@ Commands:
   check           Probe the health-endpoint of each firewall that has one, and
                   update the firewall's rules if the endpoint times out
                   or refuses the connection
+
+The config file defaults to {DEFAULT_CONFIG}.
 
 Example:
   {prog} update config.json"
@@ -65,18 +69,25 @@ enum Command {
 }
 
 impl Command {
-    /// Parses the command name and the arguments after the config file.
-    fn parse(name: &str, rest: &[String]) -> std::result::Result<Self, String> {
-        match (name, rest) {
-            ("download", [firewall_name]) => Ok(Command::Download {
+    /// Parses the command name and the arguments after it into the command
+    /// and the config file path, which defaults to `DEFAULT_CONFIG`.
+    fn parse(name: &str, rest: &[String]) -> std::result::Result<(Self, PathBuf), String> {
+        let (config, rest) = match (name, rest) {
+            ("download", [config, rest @ ..]) if !rest.is_empty() => (Some(config), rest),
+            ("update" | "check", [config, rest @ ..]) => (Some(config), rest),
+            _ => (None, rest),
+        };
+        let command = match (name, rest) {
+            ("download", [firewall_name]) => Command::Download {
                 firewall_name: firewall_name.clone(),
-            }),
-            ("download", []) => Err("download requires a firewall name".into()),
-            ("update", []) => Ok(Command::Update),
-            ("check", []) => Ok(Command::Check),
-            ("download" | "update" | "check", _) => Err(format!("too many arguments for {name}")),
-            _ => Err(format!("unknown command {name:?}")),
-        }
+            },
+            ("download", []) => return Err("download requires a firewall name".into()),
+            ("update", []) => Command::Update,
+            ("check", []) => Command::Check,
+            ("download" | "update" | "check", _) => return Err(format!("too many arguments for {name}")),
+            _ => return Err(format!("unknown command {name:?}")),
+        };
+        Ok((command, PathBuf::from(config.map_or(DEFAULT_CONFIG, String::as_str))))
     }
 }
 
@@ -155,17 +166,17 @@ impl Config {
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     let prog = args.first().map_or("hetzner-fw-updater", String::as_str);
-    if args.len() < 3 {
+    if args.len() < 2 {
         return usage(prog);
     }
-    let command = match Command::parse(&args[1], &args[3..]) {
+    let (command, config_path) = match Command::parse(&args[1], &args[2..]) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("{e}");
             return usage(prog);
         }
     };
-    ExitCode::from(run(command, Path::new(&args[2])))
+    ExitCode::from(run(command, &config_path))
 }
 
 fn run(command: Command, config_path: &Path) -> u8 {
@@ -751,15 +762,29 @@ mod tests {
     #[test]
     fn command_arguments_are_checked() {
         let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let default = Path::new(DEFAULT_CONFIG);
         assert!(matches!(
             Command::parse("download", &args(&["fw"])),
-            Ok(Command::Download { firewall_name }) if firewall_name == "fw"
+            Ok((Command::Download { firewall_name }, path)) if firewall_name == "fw" && path == default
+        ));
+        assert!(matches!(
+            Command::parse("download", &args(&["c.json", "fw"])),
+            Ok((Command::Download { firewall_name }, path)) if firewall_name == "fw" && path == Path::new("c.json")
         ));
         assert!(Command::parse("download", &[]).is_err());
-        assert!(Command::parse("update", &[]).is_ok());
-        assert!(Command::parse("update", &args(&["fw"])).is_err());
-        assert!(matches!(Command::parse("check", &[]), Ok(Command::Check)));
-        assert!(Command::parse("check", &args(&["fw"])).is_err());
+        assert!(Command::parse("download", &args(&["c.json", "fw", "x"])).is_err());
+        assert!(matches!(Command::parse("update", &[]), Ok((Command::Update, path)) if path == default));
+        assert!(matches!(
+            Command::parse("update", &args(&["c.json"])),
+            Ok((Command::Update, path)) if path == Path::new("c.json")
+        ));
+        assert!(Command::parse("update", &args(&["c.json", "fw"])).is_err());
+        assert!(matches!(Command::parse("check", &[]), Ok((Command::Check, path)) if path == default));
+        assert!(matches!(
+            Command::parse("check", &args(&["c.json"])),
+            Ok((Command::Check, path)) if path == Path::new("c.json")
+        ));
+        assert!(Command::parse("check", &args(&["c.json", "fw"])).is_err());
         assert!(Command::parse("delete-rules", &[]).is_err());
     }
 

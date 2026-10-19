@@ -115,10 +115,12 @@ Hetzner returns them.
 ## Usage
 
 ```
-hetzner-fw-updater download <config file> <firewall name>
-hetzner-fw-updater update <config file>
-hetzner-fw-updater check <config file>
+hetzner-fw-updater download [<config file>] <firewall name>
+hetzner-fw-updater update [<config file>]
+hetzner-fw-updater check [<config file>]
 ```
+
+If no config file is given, `/etc/hetzner-fw/config.json` is used.
 
 ### download
 
@@ -229,7 +231,7 @@ sudo install -m 755 target/release/hetzner-fw-updater /usr/local/bin/
    Type=oneshot
    # Read by systemd as root, before it switches to the temporary user.
    EnvironmentFile=/etc/hetzner-fw/token.env
-   ExecStart=/usr/local/bin/hetzner-fw-updater check /etc/hetzner-fw/config.json
+   ExecStart=/usr/local/bin/hetzner-fw-updater check
    # Run as a temporary user with a read-only file system.
    DynamicUser=yes
    ProtectSystem=strict
@@ -287,7 +289,7 @@ Without systemd, source the token file in the crontab line so the token itself
 is not in the crontab:
 
 ```cron
-*/10 * * * * set -a; . /etc/hetzner-fw/token.env; /usr/local/bin/hetzner-fw-updater check /etc/hetzner-fw/config.json
+*/10 * * * * set -a; . /etc/hetzner-fw/token.env; /usr/local/bin/hetzner-fw-updater check
 ```
 
 The token file must be readable by the user whose crontab this is.

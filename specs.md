@@ -17,10 +17,12 @@ config file format and the commands' user-facing behaviour, see the
 ## Invocation
 
 ```
-hetzner-fw-updater download <config file> <firewall name>
-hetzner-fw-updater update <config file>
-hetzner-fw-updater check <config file>
+hetzner-fw-updater download [<config file>] <firewall name>
+hetzner-fw-updater update [<config file>]
+hetzner-fw-updater check [<config file>]
 ```
+
+If no config file is given, `/etc/hetzner-fw/config.json` is used.
 
 All commands need a Hetzner Cloud API token in the `API_TOKEN` environment
 variable.
@@ -40,7 +42,7 @@ The format is described in the README. In addition:
 
 1. Check the arguments. On error, print the message and the usage to stderr and
    exit with code 1:
-   - fewer than two arguments: usage only;
+   - no command: usage only;
    - unknown command: `unknown command "<cmd>"`;
    - `download` without a firewall name:
      `download requires a firewall name`;
